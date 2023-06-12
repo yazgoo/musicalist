@@ -172,7 +172,7 @@ fn home() -> Html {
             let str = rmp_serde::to_vec(&val).unwrap();
             // convert str to base64
             let str = base64::encode(str);
-            let path = format!("/?content={}", str);
+            let path = format!("?content={}", str);
             url.set(path);
         }
     };
