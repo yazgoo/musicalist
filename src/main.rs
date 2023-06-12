@@ -32,7 +32,7 @@ struct MusicaList {
 
 #[derive(Debug, Clone, PartialEq, Routable)]
 pub enum Route {
-    #[at("/")]
+    #[at("/musicalist/")]
     Home,
 }
 
