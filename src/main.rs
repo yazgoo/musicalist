@@ -260,7 +260,7 @@ fn home() -> Html {
             <input type="text" value={ (*list).clone().author } oninput={update_author}/>
 
             { "'s MusicaList"}</h1>
-        <table border=1>
+        <table>
             <tr>
                 <th>{ "Musical" }</th>
                 <th>{ "Viewed in person" }</th>
