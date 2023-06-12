@@ -82,6 +82,7 @@ fn home() -> Html {
     let delete = |id| {
         let list = list.clone();
         let url = bookmark_url.clone();
+        let navigator = navigator.clone();
         move |_| {
             let list_out = MusicaList {
                 version: list.version,
@@ -93,7 +94,9 @@ fn home() -> Html {
                     .cloned()
                     .collect(),
             };
-            url.set(get_url(&list_out));
+            let (new_url, content) = get_url(&list_out);
+            url.set(new_url);
+            let _ = navigator.push_with_query(&Route::Home, &Query { content });
             list.set(list_out);
         }
     };
@@ -125,12 +128,15 @@ fn home() -> Html {
     let change_viewed = |id| {
         let list = list.clone();
         let url = bookmark_url.clone();
+        let navigator = navigator.clone();
         move |_| {
             let list_out = update_item_in_list(&list, id, |item| ListItem {
                 viewed: !item.viewed,
                 ..item.clone()
             });
-            url.set(get_url(&list_out));
+            let (new_url, content) = get_url(&list_out);
+            url.set(new_url);
+            let _ = navigator.push_with_query(&Route::Home, &Query { content });
             list.set(list_out);
         }
     };
@@ -138,6 +144,7 @@ fn home() -> Html {
     let update_rating = |id: u64, delta: i8| {
         let list = list.clone();
         let url = bookmark_url.clone();
+        let navigator = navigator.clone();
         move |_| {
             let list_out = update_item_in_list(&list, id, |item| ListItem {
                 rating: {
@@ -152,7 +159,9 @@ fn home() -> Html {
                 },
                 ..item.clone()
             });
-            url.set(get_url(&list_out));
+            let (new_url, content) = get_url(&list_out);
+            url.set(new_url);
+            let _ = navigator.push_with_query(&Route::Home, &Query { content });
             list.set(list_out);
         }
     };
@@ -160,6 +169,7 @@ fn home() -> Html {
     let change_musical = |id: u64| {
         let list = list.clone();
         let url = bookmark_url.clone();
+        let navigator = navigator.clone();
         move |e: Event| {
             let list_out = update_item_in_list(&list, id, |item| ListItem {
                 musical_id: e
@@ -169,12 +179,14 @@ fn home() -> Html {
                     .unwrap(),
                 ..item.clone()
             });
-            url.set(get_url(&list_out));
+            let (new_url, content) = get_url(&list_out);
+            url.set(new_url);
+            let _ = navigator.push_with_query(&Route::Home, &Query { content });
             list.set(list_out);
         }
     };
 
-    fn get_url(list: &MusicaList) -> String {
+    fn get_url(list: &MusicaList) -> (String, String) {
         let val = MusicaList {
             version: list.version,
             author: list.author.clone(),
@@ -182,12 +194,13 @@ fn home() -> Html {
         };
         let str = rmp_serde::to_vec(&val).unwrap();
         // convert str to base64
-        let str = base64::encode(str).replace("=", "%3D");
-        format!("?content={}", str)
+        let str = base64::encode(str);
+        (format!("?content={}", str), str)
     }
 
     let update_author = {
         let url = bookmark_url.clone();
+        let navigator = navigator.clone();
         let list = list.clone();
         Callback::from(move |e: InputEvent| {
             let list_out = MusicaList {
@@ -198,14 +211,16 @@ fn home() -> Html {
                     .clone(),
                 items: (*list).clone().items,
             };
-            let new_url = get_url(&list_out);
+            let (new_url, content) = get_url(&list_out);
             url.set(new_url);
+            let _ = navigator.push_with_query(&Route::Home, &Query { content });
             list.set(list_out);
         })
     };
 
     let add_musical = {
         let url = bookmark_url.clone();
+        let navigator = navigator.clone();
         let list = list.clone();
         move |_| {
             let mut items = list.items.clone();
@@ -220,7 +235,9 @@ fn home() -> Html {
                 author: list.author.clone(),
                 items,
             };
-            url.set(get_url(&list_out));
+            let (new_url, content) = get_url(&list_out);
+            url.set(new_url);
+            let _ = navigator.push_with_query(&Route::Home, &Query { content });
             list.set(list_out);
         }
     };
@@ -274,11 +291,6 @@ fn home() -> Html {
             })}
         </table>
         <button onclick={add_musical}>{ "➕" } </button>
-            <hr/>
-        <div>
-            <pre>{ (*bookmark_url).clone() }</pre>
-            <p><a href={ (*bookmark_url).clone() }>{"bookmark link"}</a></p>
-        </div>
         </>
     }
 }
