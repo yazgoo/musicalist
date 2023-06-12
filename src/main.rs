@@ -66,6 +66,8 @@ fn home() -> Html {
 
     let bookmark_url = use_state(|| "".to_string());
 
+    let navigator = use_navigator().unwrap();
+
     let current_location = use_location().unwrap();
 
     let content = current_location
@@ -79,8 +81,9 @@ fn home() -> Html {
 
     let delete = |id| {
         let list = list.clone();
+        let url = bookmark_url.clone();
         move |_| {
-            list.set(MusicaList {
+            let list_out = MusicaList {
                 version: list.version,
                 author: list.author.clone(),
                 items: list
@@ -89,7 +92,9 @@ fn home() -> Html {
                     .filter(|item| item.id != id)
                     .cloned()
                     .collect(),
-            });
+            };
+            url.set(get_url(&list_out));
+            list.set(list_out);
         }
     };
 
@@ -119,18 +124,22 @@ fn home() -> Html {
 
     let change_viewed = |id| {
         let list = list.clone();
+        let url = bookmark_url.clone();
         move |_| {
-            list.set(update_item_in_list(&list, id, |item| ListItem {
+            let list_out = update_item_in_list(&list, id, |item| ListItem {
                 viewed: !item.viewed,
                 ..item.clone()
-            }));
+            });
+            url.set(get_url(&list_out));
+            list.set(list_out);
         }
     };
 
     let update_rating = |id: u64, delta: i8| {
         let list = list.clone();
+        let url = bookmark_url.clone();
         move |_| {
-            list.set(update_item_in_list(&list, id, |item| ListItem {
+            let list_out = update_item_in_list(&list, id, |item| ListItem {
                 rating: {
                     let new_rating = item.rating as i8 + delta;
                     if new_rating < 0 {
@@ -142,56 +151,61 @@ fn home() -> Html {
                     }
                 },
                 ..item.clone()
-            }));
+            });
+            url.set(get_url(&list_out));
+            list.set(list_out);
         }
     };
 
     let change_musical = |id: u64| {
         let list = list.clone();
+        let url = bookmark_url.clone();
         move |e: Event| {
-            list.set(update_item_in_list(&list, id, |item| ListItem {
+            let list_out = update_item_in_list(&list, id, |item| ListItem {
                 musical_id: e
                     .target_unchecked_into::<HtmlInputElement>()
                     .value()
                     .parse::<u64>()
                     .unwrap(),
                 ..item.clone()
-            }))
+            });
+            url.set(get_url(&list_out));
+            list.set(list_out);
         }
     };
 
-    let generate_bookmark_url = {
-        let url = bookmark_url.clone();
-        let list = list.clone();
-        move |_| {
-            let val = MusicaList {
-                version: list.version,
-                author: list.author.clone(),
-                items: list.items.clone(),
-            };
-            let str = rmp_serde::to_vec(&val).unwrap();
-            // convert str to base64
-            let str = base64::encode(str);
-            let path = format!("?content={}", str);
-            url.set(path);
-        }
-    };
+    fn get_url(list: &MusicaList) -> String {
+        let val = MusicaList {
+            version: list.version,
+            author: list.author.clone(),
+            items: list.items.clone(),
+        };
+        let str = rmp_serde::to_vec(&val).unwrap();
+        // convert str to base64
+        let str = base64::encode(str).replace("=", "%3D");
+        format!("?content={}", str)
+    }
 
     let update_author = {
+        let url = bookmark_url.clone();
         let list = list.clone();
         Callback::from(move |e: InputEvent| {
-            list.set(MusicaList {
+            let list_out = MusicaList {
                 version: (*list).clone().version,
                 author: e
                     .target_unchecked_into::<HtmlInputElement>()
                     .value()
                     .clone(),
                 items: (*list).clone().items,
-            })
+            };
+            let new_url = get_url(&list_out);
+            url.set(new_url);
+            list.set(list_out);
         })
     };
 
     let add_musical = {
+        let url = bookmark_url.clone();
         let list = list.clone();
         move |_| {
             let mut items = list.items.clone();
@@ -201,11 +215,13 @@ fn home() -> Html {
                 viewed: false,
                 rating: 0,
             });
-            list.set(MusicaList {
+            let list_out = MusicaList {
                 version: list.version,
                 author: list.author.clone(),
                 items,
-            });
+            };
+            url.set(get_url(&list_out));
+            list.set(list_out);
         }
     };
 
@@ -260,10 +276,9 @@ fn home() -> Html {
         <button onclick={add_musical}>{ "➕" } </button>
             <hr/>
         <div>
+            <pre>{ (*bookmark_url).clone() }</pre>
             <p><a href={ (*bookmark_url).clone() }>{"bookmark link"}</a></p>
-            <button onclick={generate_bookmark_url}>{ "update bookmark link" }</button>
         </div>
-        <hr/>
         </>
     }
 }
