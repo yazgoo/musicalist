@@ -849,7 +849,7 @@ async function __wbg_init(input) {
     if (wasm !== undefined) return wasm;
 
     if (typeof input === 'undefined') {
-        input = new URL('musicalist-3f9e22861a696d90_bg.wasm', import.meta.url);
+        input = new URL('musicalist-74bc8e009594574a_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 
