@@ -268,11 +268,13 @@ fn home() -> Html {
     html! {
         <>
         { "Musicalist for " }
-            <input type="text" value={ (*list).clone().author } oninput={update_author}/>
-        <table>
+        <input type="text" value={ (*list).clone().author } oninput={update_author}/>
+        <br/>
+        <br/>
+        <table class={"center"}>
             <tr>
                 <th>{ "Musical" }</th>
-                <th>{ "Link" }</th>
+                <th>{ "Wiki" }</th>
                 <th>{ "Viewed" }</th>
                 <th>{ "Rating"}</th>
                 <th>{ "actions" }</th>
@@ -303,7 +305,9 @@ fn home() -> Html {
                 }
             })}
         </table>
-        <button onclick={add_musical}>{ "+" } </button>
+        <button onclick={add_musical}>{ "[+]" } </button>
+        <a href={"/musicalist"}>{ "[Clear all]" }</a>
+        <a href={"https://github.com/yazgoo/musicalist"}>{ "[about]" }</a>
         </>
     }
 }
