@@ -254,16 +254,26 @@ fn home() -> Html {
         };
     }
 
+    fn get_musical_url(musicals: &Vec<Musical>, musical_id: u64) -> String {
+        format!(
+            "https://en.wikipedia.org/wiki/{}",
+            musicals
+                .iter()
+                .find(|m| m.id == musical_id)
+                .map(|m| m.url.clone())
+                .unwrap_or("".to_string())
+        )
+    }
+
     html! {
         <>
-            <h1>
+        { "Musicalist for " }
             <input type="text" value={ (*list).clone().author } oninput={update_author}/>
-
-            { "'s MusicaList"}</h1>
         <table>
             <tr>
                 <th>{ "Musical" }</th>
-                <th>{ "Viewed in person" }</th>
+                <th>{ "Link" }</th>
+                <th>{ "Viewed" }</th>
                 <th>{ "Rating"}</th>
                 <th>{ "actions" }</th>
             </tr>
@@ -278,7 +288,10 @@ fn home() -> Html {
                                 }
                             })}
                         </select>
-                                </td>
+                        </td>
+                        <td>
+                        <a href={get_musical_url(&musicals, item.musical_id)}>{"?"}</a>
+                        </td>
                         <td><input type="checkbox" value={ format!("{}", item.viewed) } onchange={change_viewed(item.id)}/></td>
                         <td>{ item.rating }</td>
                         <td>
@@ -290,7 +303,7 @@ fn home() -> Html {
                 }
             })}
         </table>
-        <button onclick={add_musical}>{ "➕" } </button>
+        <button onclick={add_musical}>{ "+" } </button>
         </>
     }
 }
