@@ -53,6 +53,21 @@ fn app() -> Html {
     }
 }
 
+static MUSICALS: once_cell::sync::Lazy<Vec<Musical>> = once_cell::sync::Lazy::new(|| {
+    let musicals_csv = include_str!("musicals.csv");
+    let mut musicals: Vec<Musical> = vec![];
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(b'\t')
+        .from_reader(musicals_csv.as_bytes());
+    for record in reader.deserialize::<Musical>() {
+        match record {
+            Ok(musical) => musicals.push(musical),
+            Err(err) => info!("{:?}", err),
+        };
+    }
+    musicals
+});
+
 #[function_component(Home)]
 fn home() -> Html {
     wasm_logger::init(wasm_logger::Config::default());
@@ -61,9 +76,6 @@ fn home() -> Html {
         author: "".to_string(),
         items: vec![],
     };
-
-    let musicals_csv = include_str!("musicals.csv");
-
     let bookmark_url = use_state(|| "".to_string());
 
     let navigator = use_navigator().unwrap();
@@ -242,22 +254,10 @@ fn home() -> Html {
         }
     };
 
-    let mut musicals: Vec<Musical> = vec![];
-
-    info!("{}", musicals_csv);
-
-    let mut reader = csv::Reader::from_reader(musicals_csv.as_bytes());
-    for record in reader.deserialize::<Musical>() {
-        match record {
-            Ok(musical) => musicals.push(musical),
-            Err(err) => info!("{:?}", err),
-        };
-    }
-
-    fn get_musical_url(musicals: &Vec<Musical>, musical_id: u64) -> String {
+    fn get_musical_url(musical_id: u64) -> String {
         format!(
             "https://en.wikipedia.org/wiki/{}",
-            musicals
+            MUSICALS
                 .iter()
                 .find(|m| m.id == musical_id)
                 .map(|m| m.url.clone())
@@ -284,15 +284,30 @@ fn home() -> Html {
                     <tr>
                         <td>
                         <select onchange={change_musical(item.id)}>
-                            { for musicals.iter().map(|m| {
+                            { for MUSICALS.iter().map(|m| {
+                                if m.id == item.musical_id {
+                                    html! {
+                                        <option value={ format!("{}", m.id) } selected=true>{ &m.name }</option>
+                                    }
+                                } else {
+                                    html! {
+                                    }
+                                }
+                            })}
+                            { for MUSICALS.iter().map(|m| {
+                                if m.id != item.musical_id {
                                 html! {
-                                    <option value={ format!("{}", m.id) } selected={ m.id == item.musical_id }>{ &m.name }</option>
+                                    <option value={ format!("{}", m.id) }>{ &m.name }</option>
+                                }
+                                } else {
+                                    html! {
+                                    }
                                 }
                             })}
                         </select>
                         </td>
                         <td>
-                        <a href={get_musical_url(&musicals, item.musical_id)}>{"?"}</a>
+                        <a href={get_musical_url(item.musical_id)}>{"?"}</a>
                         </td>
                         <td><input type="checkbox" value={ format!("{}", item.viewed) } onchange={change_viewed(item.id)}/></td>
                         <td>{ item.rating }</td>
