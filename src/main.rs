@@ -1,34 +1,10 @@
+mod model;
 use log::info;
+mod musicals;
 use web_sys::{HtmlInputElement, InputEvent};
 use yew::prelude::*;
 use yew_router::prelude::*;
-
-#[derive(serde::Serialize, serde::Deserialize)]
-struct Query {
-    content: String,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
-struct Musical {
-    id: u64,
-    name: String,
-    url: String,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
-struct ListItem {
-    id: u64,
-    musical_id: u64,
-    viewed: bool,
-    rating: u8,
-}
-
-#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
-struct MusicaList {
-    version: u8,
-    author: String,
-    items: Vec<ListItem>,
-}
+include!("musicals.rs");
 
 #[derive(Debug, Clone, PartialEq, Routable)]
 pub enum Route {
@@ -52,21 +28,6 @@ fn app() -> Html {
         </BrowserRouter>
     }
 }
-
-static MUSICALS: once_cell::sync::Lazy<Vec<Musical>> = once_cell::sync::Lazy::new(|| {
-    let musicals_csv = include_str!("musicals.csv");
-    let mut musicals: Vec<Musical> = vec![];
-    let mut reader = csv::ReaderBuilder::new()
-        .delimiter(b'\t')
-        .from_reader(musicals_csv.as_bytes());
-    for record in reader.deserialize::<Musical>() {
-        match record {
-            Ok(musical) => musicals.push(musical),
-            Err(err) => info!("{:?}", err),
-        };
-    }
-    musicals
-});
 
 #[function_component(Home)]
 fn home() -> Html {
@@ -257,7 +218,7 @@ fn home() -> Html {
     fn get_musical_url(musical_id: u64) -> String {
         format!(
             "https://en.wikipedia.org/wiki/{}",
-            MUSICALS
+            musicals::MUSICALS
                 .iter()
                 .find(|m| m.id == musical_id)
                 .map(|m| m.url.clone())

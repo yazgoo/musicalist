@@ -20,3 +20,7 @@ version = "0.3"
 features = [
 	"HtmlInputElement",
 ]
+
+[profile.dev]
+opt-level = 1
+incremental = true
