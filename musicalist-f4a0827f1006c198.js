@@ -820,16 +820,16 @@ function __wbg_get_imports() {
         const ret = wasm.memory;
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_closure_wrapper856 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 373, __wbg_adapter_36);
+    imports.wbg.__wbindgen_closure_wrapper796 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 346, __wbg_adapter_36);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_closure_wrapper1161 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 479, __wbg_adapter_39);
+    imports.wbg.__wbindgen_closure_wrapper1101 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 452, __wbg_adapter_39);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_closure_wrapper1168 = function(arg0, arg1, arg2) {
-        const ret = makeMutClosure(arg0, arg1, 483, __wbg_adapter_42);
+    imports.wbg.__wbindgen_closure_wrapper1108 = function(arg0, arg1, arg2) {
+        const ret = makeMutClosure(arg0, arg1, 456, __wbg_adapter_42);
         return addHeapObject(ret);
     };
 
@@ -872,7 +872,7 @@ async function __wbg_init(input) {
     if (wasm !== undefined) return wasm;
 
     if (typeof input === 'undefined') {
-        input = new URL('musicalist-3e8a5cb60e73b686_bg.wasm', import.meta.url);
+        input = new URL('musicalist-f4a0827f1006c198_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 
