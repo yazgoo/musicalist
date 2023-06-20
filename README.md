@@ -11,3 +11,7 @@ To share your list, just right click and copy the "share url".
 
 The app does not store your list, all your data is in the URL.
 This means that in order to update your list you need to re-share the updated link.
+
+# my musical is not in the list
+
+Adding a musical can be done by doing a PR in musicals.csv
