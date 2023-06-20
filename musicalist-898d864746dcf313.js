@@ -844,7 +844,7 @@ function __wbg_get_imports() {
         const ret = makeMutClosure(arg0, arg1, 29, __wbg_adapter_36);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_closure_wrapper1645 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper1660 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 47, __wbg_adapter_39);
         return addHeapObject(ret);
     };
@@ -888,7 +888,7 @@ async function __wbg_init(input) {
     if (wasm !== undefined) return wasm;
 
     if (typeof input === 'undefined') {
-        input = new URL('musicalist-d0f416e1617e5a84_bg.wasm', import.meta.url);
+        input = new URL('musicalist-898d864746dcf313_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 
