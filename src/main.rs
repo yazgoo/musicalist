@@ -41,6 +41,18 @@ fn get_list_value(content: &str) -> MusicaList {
         .unwrap_or(default_list)
 }
 
+fn get_url(list: &MusicaList) -> (String, String) {
+    let val = MusicaList {
+        version: list.version,
+        author: list.author.clone(),
+        items: list.items.clone(),
+    };
+    let str = rmp_serde::to_vec(&val).unwrap();
+    // convert str to base64
+    let str = general_purpose::STANDARD.encode(str);
+    (format!("?content={}", str), str)
+}
+
 #[function_component(Home)]
 fn home() -> Html {
     wasm_logger::init(wasm_logger::Config::default());
@@ -66,27 +78,19 @@ fn home() -> Html {
 
     let list = use_state(|| list_value.clone());
 
-    let delete = |id| {
-        let list = list.clone();
-        let url = bookmark_url.clone();
-        let navigator = navigator.clone();
-        move |_| {
-            let list_out = MusicaList {
-                version: list.version,
-                author: list.author.clone(),
-                items: list
-                    .items
-                    .iter()
-                    .filter(|item| item.id != id)
-                    .cloned()
-                    .collect(),
-            };
-            let (new_url, content) = get_url(&list_out);
-            url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
-            list.set(list_out);
-        }
-    };
+    macro_rules! update_list_fn {
+        ($list:expr, $list_out:expr) => {{
+            let bookmark_url = bookmark_url.clone();
+            let navigator = navigator.clone();
+            move |_| {
+                let list_out = $list_out;
+                let (new_url, content) = get_url(&list_out);
+                bookmark_url.set(new_url);
+                let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
+                $list.set(list_out);
+            }
+        }};
+    }
 
     fn update_item_in_list(
         list: &MusicaList,
@@ -127,27 +131,38 @@ fn home() -> Html {
         }
     };
 
+    let delete = |id| {
+        let list = list.clone();
+        update_list_fn!(
+            list,
+            MusicaList {
+                version: list.version,
+                author: list.author.clone(),
+                items: list
+                    .items
+                    .iter()
+                    .filter(|item| item.id != id)
+                    .cloned()
+                    .collect(),
+            }
+        )
+    };
+
     let change_viewed = |id| {
         let list = list.clone();
-        let url = bookmark_url.clone();
-        let navigator = navigator.clone();
-        move |_| {
-            let list_out = update_item_in_list(&list, id, |item| ListItem {
+        update_list_fn!(
+            list,
+            update_item_in_list(&list, id, |item| ListItem {
                 viewed: !item.viewed,
                 ..item.clone()
-            });
-            let (new_url, content) = get_url(&list_out);
-            url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
-            list.set(list_out);
-        }
+            })
+        )
     };
 
     let move_item = |id: usize, delta: i8| {
+        /* swap id and new_index in list */
         let list = list.clone();
-        let url = bookmark_url.clone();
-        let navigator = navigator.clone();
-        move |_| {
+        update_list_fn!(list, {
             let new_index = id as i8 + delta;
             let new_index = if new_index < 0 {
                 0
@@ -158,25 +173,19 @@ fn home() -> Html {
             };
             let mut items = list.items.clone();
             items.swap(id as usize, new_index as usize);
-            /* swap id and new_index in list */
-            let list_out = MusicaList {
+            MusicaList {
                 items,
                 author: list.author.clone(),
                 version: list.version,
-            };
-            let (new_url, content) = get_url(&list_out);
-            url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
-            list.set(list_out);
-        }
+            }
+        })
     };
 
     let update_rating = |id: u64, delta: i8| {
         let list = list.clone();
-        let url = bookmark_url.clone();
-        let navigator = navigator.clone();
-        move |_| {
-            let list_out = update_item_in_list(&list, id, |item| ListItem {
+        update_list_fn!(
+            list,
+            update_item_in_list(&list, id, |item| ListItem {
                 rating: {
                     let new_rating = item.rating as i8 + delta;
                     if new_rating < 0 {
@@ -188,11 +197,38 @@ fn home() -> Html {
                     }
                 },
                 ..item.clone()
+            })
+        )
+    };
+
+    let add_musical = {
+        let list = list.clone();
+        update_list_fn!(list, {
+            let mut items = list.items.clone();
+            items.push(ListItem {
+                id: list.items.len() as u64 + 1,
+                musical_id: 1,
+                viewed: false,
+                rating: 0,
             });
-            let (new_url, content) = get_url(&list_out);
-            url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
-            list.set(list_out);
+            MusicaList {
+                version: list.version,
+                author: list.author.clone(),
+                items,
+            }
+        })
+    };
+
+    let go = |i| {
+        let navigator = navigator.clone();
+        let list = list.clone();
+        let trigger = trigger.clone();
+        let current_location = current_location.clone();
+        move |_| {
+            navigator.go(i);
+            trigger.force_update();
+            let query = current_location.query::<Query>().unwrap();
+            list.set(get_list_value(&query.content));
         }
     };
 
@@ -216,18 +252,6 @@ fn home() -> Html {
         }
     };
 
-    fn get_url(list: &MusicaList) -> (String, String) {
-        let val = MusicaList {
-            version: list.version,
-            author: list.author.clone(),
-            items: list.items.clone(),
-        };
-        let str = rmp_serde::to_vec(&val).unwrap();
-        // convert str to base64
-        let str = general_purpose::STANDARD.encode(str);
-        (format!("?content={}", str), str)
-    }
-
     let update_author = {
         let url = bookmark_url.clone();
         let navigator = navigator.clone();
@@ -248,41 +272,6 @@ fn home() -> Html {
         })
     };
 
-    let add_musical = {
-        let url = bookmark_url.clone();
-        let navigator = navigator.clone();
-        let list = list.clone();
-        move |_| {
-            let mut items = list.items.clone();
-            items.push(ListItem {
-                id: list.items.len() as u64 + 1,
-                musical_id: 1,
-                viewed: false,
-                rating: 0,
-            });
-            let list_out = MusicaList {
-                version: list.version,
-                author: list.author.clone(),
-                items,
-            };
-            let (new_url, content) = get_url(&list_out);
-            url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
-            list.set(list_out);
-        }
-    };
-    let go = |i| {
-        let navigator = navigator.clone();
-        let list = list.clone();
-        let trigger = trigger.clone();
-        let current_location = current_location.clone();
-        move |_| {
-            navigator.go(i);
-            trigger.force_update();
-            let query = current_location.query::<Query>().unwrap();
-            list.set(get_list_value(&query.content));
-        }
-    };
     fn get_musical_url(musical_id: u64) -> String {
         format!(
             "https://en.wikipedia.org/wiki/{}",
