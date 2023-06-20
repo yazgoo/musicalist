@@ -1,6 +1,6 @@
 mod model;
-use log::info;
 mod musicals;
+use base64::{engine::general_purpose, Engine as _};
 use web_sys::{HtmlInputElement, InputEvent};
 use yew::prelude::*;
 use yew_router::prelude::*;
@@ -43,11 +43,21 @@ fn home() -> Html {
 
     let current_location = use_location().unwrap();
 
+    let location = yew_hooks::use_location();
+
     let content = current_location
         .query::<Query>()
         .map_or("".to_string(), |query| query.content);
-    let list_value: MusicaList = base64::decode(content)
-        .map(|bytes| rmp_serde::from_read_ref(&bytes).unwrap_or(default_list.clone()))
+
+    let trigger = use_force_update();
+
+    let edit = current_location
+        .query::<Query>()
+        .map_or(Some(false), |query| query.edit);
+
+    let list_value: MusicaList = general_purpose::STANDARD
+        .decode(content)
+        .map(|bytes| rmp_serde::from_read(&bytes[..]).unwrap_or(default_list.clone()))
         .unwrap_or(default_list);
 
     let list = use_state(|| list_value.clone());
@@ -69,7 +79,7 @@ fn home() -> Html {
             };
             let (new_url, content) = get_url(&list_out);
             url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content });
+            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
             list.set(list_out);
         }
     };
@@ -98,6 +108,21 @@ fn home() -> Html {
         }
     }
 
+    let change_edit = {
+        let navigator = navigator.clone();
+        let list = list.clone();
+        move |_| {
+            let (_, content) = get_url(&list);
+            let _ = navigator.push_with_query(
+                &Route::Home,
+                &Query {
+                    content,
+                    edit: Some(!(edit == Some(true))),
+                },
+            );
+        }
+    };
+
     let change_viewed = |id| {
         let list = list.clone();
         let url = bookmark_url.clone();
@@ -109,7 +134,7 @@ fn home() -> Html {
             });
             let (new_url, content) = get_url(&list_out);
             url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content });
+            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
             list.set(list_out);
         }
     };
@@ -134,7 +159,7 @@ fn home() -> Html {
             });
             let (new_url, content) = get_url(&list_out);
             url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content });
+            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
             list.set(list_out);
         }
     };
@@ -154,7 +179,7 @@ fn home() -> Html {
             });
             let (new_url, content) = get_url(&list_out);
             url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content });
+            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
             list.set(list_out);
         }
     };
@@ -167,7 +192,7 @@ fn home() -> Html {
         };
         let str = rmp_serde::to_vec(&val).unwrap();
         // convert str to base64
-        let str = base64::encode(str);
+        let str = general_purpose::STANDARD.encode(str);
         (format!("?content={}", str), str)
     }
 
@@ -186,7 +211,7 @@ fn home() -> Html {
             };
             let (new_url, content) = get_url(&list_out);
             url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content });
+            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
             list.set(list_out);
         })
     };
@@ -210,11 +235,17 @@ fn home() -> Html {
             };
             let (new_url, content) = get_url(&list_out);
             url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content });
+            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
             list.set(list_out);
         }
     };
-
+    let undo = {
+        let navigator = navigator.clone();
+        move |_| {
+            navigator.go(-1);
+            trigger.force_update()
+        }
+    };
     fn get_musical_url(musical_id: u64) -> String {
         format!(
             "https://en.wikipedia.org/wiki/{}",
@@ -226,10 +257,16 @@ fn home() -> Html {
         )
     }
 
+    let mut i = 0;
     html! {
         <>
-        { "Musicalist for " }
-        <input type="text" value={ (*list).clone().author } oninput={update_author}/>
+        if edit == Some(true) {
+            { "Musicalist for " }
+            <input type="text" value={ (*list).clone().author } oninput={update_author}/>
+        } else {
+            { (*list).clone().author }
+            { "'s Musicalist" }
+        }
         <br/>
         <br/>
         <table class={"center"}>
@@ -238,12 +275,16 @@ fn home() -> Html {
                 <th>{ "Wiki" }</th>
                 <th>{ "Viewed" }</th>
                 <th>{ "Rating"}</th>
-                <th>{ "actions" }</th>
+                if  edit == Some(true) {
+                    <th>{ "actions" }</th>
+                }
             </tr>
             { for (*list).clone().items.iter().map(|item| {
+                                                              { i += 1; }
                 html! {
                     <tr>
                         <td>
+                        if i == (*list).items.len() && edit == Some(true) {
                         <select onchange={change_musical(item.id)}>
                             { for MUSICALS.iter().map(|m| {
                                 if m.id == item.musical_id {
@@ -266,24 +307,63 @@ fn home() -> Html {
                                 }
                             })}
                         </select>
+                        } else {
+                            { MUSICALS.iter().find(|m| m.id == item.musical_id).map(|m| m.name.clone()).unwrap_or("".to_string()) }
+                        }
                         </td>
                         <td>
                         <a href={get_musical_url(item.musical_id)}>{"?"}</a>
                         </td>
-                        <td><input type="checkbox" value={ format!("{}", item.viewed) } onchange={change_viewed(item.id)}/></td>
-                        <td>{ item.rating }</td>
                         <td>
-                        <button onclick={update_rating(item.id, 1)}>{ "+" } </button>
-                        <button onclick={update_rating(item.id, -1)}>{ "-" } </button>
-                        <button onclick={delete(item.id)}>{ "🗑 " } </button>
+                        if edit == Some(true) {
+                            <input type="checkbox" checked={ item.viewed } onchange={change_viewed(item.id)}/>
+                        } else {
+                            { if item.viewed { "👁" } else { "" } }
+                        }
                         </td>
+                        <td>{ item.rating }</td>
+                        if edit == Some(true) {
+                            <td>
+                                <button onclick={update_rating(item.id, 1)}>{ "➕" } </button>
+                                { " " }
+                                <button onclick={update_rating(item.id, -1)}>{ "➖" } </button>
+                                { " " }
+                                <button onclick={delete(item.id)}>{ "🗑 " } </button>
+                                </td>
+                        }
                     </tr>
                 }
             })}
         </table>
-        <button onclick={add_musical}>{ "[+]" } </button>
-        <a href={"/musicalist"}>{ "[Clear all]" }</a>
-        <a href={"https://github.com/yazgoo/musicalist"}>{ "[about]" }</a>
+        <p>
+        if edit == Some(true) {
+            <button onclick={add_musical} title="add musical">{ "➕" } </button>
+            { " " }
+            <button onclick={undo} title="undo">{ "🔙" } </button>
+            { " " }
+        }
+        <button onclick={change_edit} title={
+            if edit == Some(true) {
+                "switch to read-only mode"
+            } else {
+                "switch to edit mode"
+            }
+        }> {
+            if edit == Some(true) {
+                "👁 "
+            } else {
+                "🖊 "
+            }
+        } </button>
+        </p>
+        <p>
+        <a href={"/musicalist"}>{ "Clear all" }</a>
+        { " " }
+        <a href={"https://github.com/yazgoo/musicalist"}>{ "about" }</a>
+        { " " }
+        <a href={ location.href.clone().replace("edit=true", "edit=false") }
+        title={"Right click + copy link adress to get url"}>{ "sharing url" }</a>
+        </p>
         </>
     }
 }

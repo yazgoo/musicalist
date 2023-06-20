@@ -1,6 +1,7 @@
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Query {
     content: String,
+    edit: Option<bool>,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
