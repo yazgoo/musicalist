@@ -29,14 +29,21 @@ fn app() -> Html {
     }
 }
 
-#[function_component(Home)]
-fn home() -> Html {
-    wasm_logger::init(wasm_logger::Config::default());
+fn get_list_value(content: &str) -> MusicaList {
     let default_list = MusicaList {
         version: 1,
         author: "".to_string(),
         items: vec![],
     };
+    general_purpose::STANDARD
+        .decode(content)
+        .map(|bytes| rmp_serde::from_read(&bytes[..]).unwrap_or(default_list.clone()))
+        .unwrap_or(default_list)
+}
+
+#[function_component(Home)]
+fn home() -> Html {
+    wasm_logger::init(wasm_logger::Config::default());
     let bookmark_url = use_state(|| "".to_string());
 
     let navigator = use_navigator().unwrap();
@@ -55,10 +62,7 @@ fn home() -> Html {
         .query::<Query>()
         .map_or(Some(false), |query| query.edit);
 
-    let list_value: MusicaList = general_purpose::STANDARD
-        .decode(content)
-        .map(|bytes| rmp_serde::from_read(&bytes[..]).unwrap_or(default_list.clone()))
-        .unwrap_or(default_list);
+    let list_value: MusicaList = get_list_value(&content);
 
     let list = use_state(|| list_value.clone());
 
@@ -132,6 +136,34 @@ fn home() -> Html {
                 viewed: !item.viewed,
                 ..item.clone()
             });
+            let (new_url, content) = get_url(&list_out);
+            url.set(new_url);
+            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
+            list.set(list_out);
+        }
+    };
+
+    let move_item = |id: usize, delta: i8| {
+        let list = list.clone();
+        let url = bookmark_url.clone();
+        let navigator = navigator.clone();
+        move |_| {
+            let new_index = id as i8 + delta;
+            let new_index = if new_index < 0 {
+                0
+            } else if new_index >= list.items.len() as i8 {
+                list.items.len() as i8 - 1
+            } else {
+                new_index
+            };
+            let mut items = list.items.clone();
+            items.swap(id as usize, new_index as usize);
+            /* swap id and new_index in list */
+            let list_out = MusicaList {
+                items,
+                author: list.author.clone(),
+                version: list.version,
+            };
             let (new_url, content) = get_url(&list_out);
             url.set(new_url);
             let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
@@ -239,11 +271,16 @@ fn home() -> Html {
             list.set(list_out);
         }
     };
-    let undo = {
+    let go = |i| {
         let navigator = navigator.clone();
+        let list = list.clone();
+        let trigger = trigger.clone();
+        let current_location = current_location.clone();
         move |_| {
-            navigator.go(-1);
-            trigger.force_update()
+            navigator.go(i);
+            trigger.force_update();
+            let query = current_location.query::<Query>().unwrap();
+            list.set(get_list_value(&query.content));
         }
     };
     fn get_musical_url(musical_id: u64) -> String {
@@ -324,11 +361,15 @@ fn home() -> Html {
                         <td>{ item.rating }</td>
                         if edit == Some(true) {
                             <td>
-                                <button onclick={update_rating(item.id, 1)}>{ "➕" } </button>
+                                <button title="increase rating" onclick={update_rating(item.id, 1)}>{ "➕" } </button>
                                 { " " }
-                                <button onclick={update_rating(item.id, -1)}>{ "➖" } </button>
+                                <button title="decrease rating" onclick={update_rating(item.id, -1)}>{ "➖" } </button>
                                 { " " }
-                                <button onclick={delete(item.id)}>{ "🗑 " } </button>
+                                <button title="move up" onclick={move_item(i - 1, -1)}>{ "⬆" } </button>
+                                { " " }
+                                <button title="move down" onclick={move_item(i - 1, 1)}>{ "⬇" } </button>
+                                { " " }
+                                <button title="remove entry" onclick={delete(item.id)}>{ "🗑 " } </button>
                                 </td>
                         }
                     </tr>
@@ -339,7 +380,9 @@ fn home() -> Html {
         if edit == Some(true) {
             <button onclick={add_musical} title="add musical">{ "➕" } </button>
             { " " }
-            <button onclick={undo} title="undo">{ "🔙" } </button>
+            <button onclick={go(-1)} title="undo">{ "🔙" } </button>
+            { " " }
+            <button onclick={go(1)} title="redo">{ "⏩" } </button>
             { " " }
         }
         <button onclick={change_edit} title={
