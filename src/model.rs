@@ -1,7 +1,8 @@
 #[derive(serde::Serialize, serde::Deserialize)]
 struct Query {
-    content: String,
+    content: Option<String>,
     edit: Option<bool>,
+    user: Option<String>,
 }
 
 #[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
@@ -24,4 +25,10 @@ struct MusicaList {
     version: u8,
     author: String,
     items: Vec<ListItem>,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone)]
+struct Users {
+    version: u8,
+    items: Vec<String>,
 }

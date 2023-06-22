@@ -16,6 +16,8 @@ yew-hooks = { version = "0.2" }
 rmp-serde = { version = "1" }
 serde = { version = "1", features = ["derive"] }
 base64 = "0.21"
+gloo = "0.8"
+gloo-storage = "0.2"
 [dependencies.web-sys]
 version = "0.3"
 features = [

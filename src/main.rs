@@ -1,6 +1,8 @@
 mod model;
 mod musicals;
 use base64::{engine::general_purpose, Engine as _};
+use gloo::storage::LocalStorage;
+use gloo_storage::Storage;
 use web_sys::{HtmlInputElement, InputEvent};
 use yew::prelude::*;
 use yew_router::prelude::*;
@@ -29,16 +31,18 @@ fn app() -> Html {
     }
 }
 
-fn get_list_value(content: &str) -> MusicaList {
+fn get_list_value(content: &Option<String>) -> MusicaList {
     let default_list = MusicaList {
         version: 1,
         author: "".to_string(),
         items: vec![],
     };
-    general_purpose::STANDARD
-        .decode(content)
-        .map(|bytes| rmp_serde::from_read(&bytes[..]).unwrap_or(default_list.clone()))
-        .unwrap_or(default_list)
+    content.clone().map_or(default_list.clone(), |content| {
+        general_purpose::STANDARD
+            .decode(content)
+            .map(|bytes| rmp_serde::from_read(&bytes[..]).unwrap_or(default_list.clone()))
+            .unwrap_or(default_list)
+    })
 }
 
 fn get_url(list: &MusicaList) -> (String, String) {
@@ -53,20 +57,108 @@ fn get_url(list: &MusicaList) -> (String, String) {
     (format!("?content={}", str), str)
 }
 
+fn get_users() -> Users {
+    let default_users = Users {
+        version: 1,
+        items: vec![],
+    };
+    let users_local_storage_key = "users";
+    let users_local_storage: String =
+        LocalStorage::get(users_local_storage_key).unwrap_or_default();
+    general_purpose::STANDARD
+        .decode(&users_local_storage)
+        .map(|bytes| rmp_serde::from_read(&bytes[..]).unwrap_or(default_users.clone()))
+        .unwrap_or(default_users)
+}
+
+fn add_user(user: &String) {
+    let users = get_users();
+    if users.items.contains(user) {
+        return;
+    }
+    let mut users = users.clone();
+    users.items.push(user.to_string());
+    let str = rmp_serde::to_vec(&users).unwrap();
+    // convert str to base64
+    let str = general_purpose::STANDARD.encode(str);
+    let users_local_storage_key = "users";
+    LocalStorage::set(users_local_storage_key, &str).unwrap();
+}
+
+fn delete_user(user: &String) {
+    let users = get_users();
+    if !users.items.contains(user) {
+        return;
+    }
+    let mut users = users.clone();
+    users.items.retain(|x| x != user);
+    let str = rmp_serde::to_vec(&users).unwrap();
+    // convert str to base64
+    let str = general_purpose::STANDARD.encode(str);
+    let users_local_storage_key = "users";
+    LocalStorage::set(users_local_storage_key, &str).unwrap();
+    delete_user_content(user);
+}
+
+fn get_content_local_storage(user: &Option<String>) -> String {
+    let content_local_storage_key = "content";
+    if let Some(user) = user {
+        log::info!("load user: {}", user);
+        LocalStorage::get(&format!("{}/{}", content_local_storage_key, user)).unwrap_or_default()
+    } else {
+        LocalStorage::get(content_local_storage_key).unwrap_or_default()
+    }
+}
+
+fn save_user_content_to_local_storage(list_value: &MusicaList, content: &String) {
+    let content_local_storage_key = "content";
+    let user_key = format!("{}/{}", content_local_storage_key, &list_value.author);
+    log::info!("save user: {}", user_key);
+    LocalStorage::set(user_key, &content).unwrap();
+}
+
+fn add_user_and_content(list_value: &MusicaList, content: &String) {
+    if list_value.author.is_empty() {
+        return;
+    }
+    add_user(&list_value.author);
+    save_user_content_to_local_storage(list_value, content);
+}
+
+fn delete_user_content(user: &String) {
+    let content_local_storage_key = "content";
+    let user_key = format!("{}/{}", content_local_storage_key, user);
+    log::info!("delete user: {}", user_key);
+    LocalStorage::delete(&user_key);
+}
+
 #[function_component(Home)]
 fn home() -> Html {
-    wasm_logger::init(wasm_logger::Config::default());
     let bookmark_url = use_state(|| "".to_string());
 
     let navigator = use_navigator().unwrap();
 
+    let content_local_storage_key = "content";
     let current_location = use_location().unwrap();
 
     let location = yew_hooks::use_location();
 
-    let content = current_location
+    let content_local_storage: String = get_content_local_storage(
+        &current_location
+            .query::<Query>()
+            .map_or(None, |query| query.user),
+    );
+    let content: Option<String> = current_location
         .query::<Query>()
-        .map_or("".to_string(), |query| query.content);
+        .map_or(Some(content_local_storage.clone()), |query| query.content);
+
+    let content = {
+        if content == None {
+            Some(content_local_storage)
+        } else {
+            content
+        }
+    };
 
     let trigger = use_force_update();
 
@@ -75,6 +167,7 @@ fn home() -> Html {
         .map_or(Some(false), |query| query.edit);
 
     let list_value: MusicaList = get_list_value(&content);
+    content.map(|c| add_user_and_content(&list_value, &c));
 
     let list = use_state(|| list_value.clone());
 
@@ -86,7 +179,17 @@ fn home() -> Html {
                 let list_out = $list_out;
                 let (new_url, content) = get_url(&list_out);
                 bookmark_url.set(new_url);
-                let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
+                LocalStorage::set(content_local_storage_key, &content).unwrap();
+                add_user_and_content(&list_out, &content);
+                let _ = navigator.push_with_query(
+                    &Route::Home,
+                    &Query {
+                        content: Some(content),
+                        edit,
+                        user: None,
+                    },
+                );
+                add_user(&list_out.author);
                 $list.set(list_out);
             }
         }};
@@ -124,10 +227,17 @@ fn home() -> Html {
             let _ = navigator.push_with_query(
                 &Route::Home,
                 &Query {
-                    content,
+                    content: Some(content),
                     edit: Some(!(edit == Some(true))),
+                    user: None,
                 },
             );
+        }
+    };
+
+    let delete_user = |user| {
+        move |_| {
+            delete_user(&user);
         }
     };
 
@@ -247,7 +357,14 @@ fn home() -> Html {
             });
             let (new_url, content) = get_url(&list_out);
             url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
+            let _ = navigator.push_with_query(
+                &Route::Home,
+                &Query {
+                    content: Some(content),
+                    edit,
+                    user: None,
+                },
+            );
             list.set(list_out);
         }
     };
@@ -267,7 +384,14 @@ fn home() -> Html {
             };
             let (new_url, content) = get_url(&list_out);
             url.set(new_url);
-            let _ = navigator.push_with_query(&Route::Home, &Query { content, edit });
+            let _ = navigator.push_with_query(
+                &Route::Home,
+                &Query {
+                    content: Some(content),
+                    edit,
+                    user: None,
+                },
+            );
             list.set(list_out);
         })
     };
@@ -396,10 +520,22 @@ fn home() -> Html {
         <a href={ location.href.clone().replace("edit=true", "edit=false") }
         title={"Right click + copy link adress to get url"}>{ "sharing url" }</a>
         </p>
+        { "Users:" }
+        <br/>
+        { for get_users().items.iter().map(|user| {
+            html! {
+                <>
+                <a href={ format!("/musicalist?user={}", user) }>{ user }</a>
+                <button title="remove user list" onclick={delete_user(user.clone())}>{ "🗑 " } </button>
+                <br/>
+                </>
+            }
+        })}
         </>
     }
 }
 
 fn main() {
+    wasm_logger::init(wasm_logger::Config::default());
     yew::Renderer::<App>::new().render();
 }
