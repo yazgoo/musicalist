@@ -357,9 +357,6 @@ function __wbg_get_imports() {
         const ret = getObject(arg0).lastChild;
         return isLikeNone(ret) ? 0 : addHeapObject(ret);
     };
-    imports.wbg.__wbg_removeItem_3edd1d51c937f201 = function() { return handleError(function (arg0, arg1, arg2) {
-        getObject(arg0).removeItem(getStringFromWasm0(arg1, arg2));
-    }, arguments) };
     imports.wbg.__wbg_new_abda76e883ba8a5f = function() {
         const ret = new Error();
         return addHeapObject(ret);
@@ -702,6 +699,9 @@ function __wbg_get_imports() {
         getInt32Memory0()[arg0 / 4 + 1] = len1;
         getInt32Memory0()[arg0 / 4 + 0] = ptr1;
     }, arguments) };
+    imports.wbg.__wbg_removeItem_3edd1d51c937f201 = function() { return handleError(function (arg0, arg1, arg2) {
+        getObject(arg0).removeItem(getStringFromWasm0(arg1, arg2));
+    }, arguments) };
     imports.wbg.__wbg_setItem_e9a65f0e6892d9c9 = function() { return handleError(function (arg0, arg1, arg2, arg3, arg4) {
         getObject(arg0).setItem(getStringFromWasm0(arg1, arg2), getStringFromWasm0(arg3, arg4));
     }, arguments) };
@@ -883,7 +883,7 @@ function __wbg_get_imports() {
         const ret = makeMutClosure(arg0, arg1, 30, __wbg_adapter_36);
         return addHeapObject(ret);
     };
-    imports.wbg.__wbindgen_closure_wrapper1776 = function(arg0, arg1, arg2) {
+    imports.wbg.__wbindgen_closure_wrapper1781 = function(arg0, arg1, arg2) {
         const ret = makeMutClosure(arg0, arg1, 51, __wbg_adapter_39);
         return addHeapObject(ret);
     };
@@ -927,7 +927,7 @@ async function __wbg_init(input) {
     if (wasm !== undefined) return wasm;
 
     if (typeof input === 'undefined') {
-        input = new URL('musicalist-4b503ec958c36e31_bg.wasm', import.meta.url);
+        input = new URL('musicalist-fec1a707e36f0f50_bg.wasm', import.meta.url);
     }
     const imports = __wbg_get_imports();
 
