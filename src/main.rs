@@ -31,9 +31,11 @@ fn app() -> Html {
     }
 }
 
+static CURRENT_VERSION: u8 = 1;
+
 fn get_list_value(content: &Option<String>) -> MusicaList {
     let default_list = MusicaList {
-        version: 1,
+        version: CURRENT_VERSION,
         author: "".to_string(),
         items: vec![],
     };
@@ -45,7 +47,7 @@ fn get_list_value(content: &Option<String>) -> MusicaList {
     })
 }
 
-fn get_url(list: &MusicaList) -> (String, String) {
+fn get_content(list: &MusicaList) -> String {
     let val = MusicaList {
         version: list.version,
         author: list.author.clone(),
@@ -53,7 +55,11 @@ fn get_url(list: &MusicaList) -> (String, String) {
     };
     let str = rmp_serde::to_vec(&val).unwrap();
     // convert str to base64
-    let str = general_purpose::STANDARD.encode(str);
+    general_purpose::STANDARD.encode(str)
+}
+
+fn get_url(list: &MusicaList) -> (String, String) {
+    let str = get_content(list);
     (format!("?content={}", str), str)
 }
 
@@ -87,7 +93,9 @@ fn add_user(user: &String) {
 
 fn delete_user(user: &String) {
     let users = get_users();
+    log::info!("delete user: {}", user);
     if !users.items.contains(user) {
+        log::info!("user list does not contain: {}", user);
         return;
     }
     let mut users = users.clone();
@@ -98,6 +106,9 @@ fn delete_user(user: &String) {
     let users_local_storage_key = "users";
     LocalStorage::set(users_local_storage_key, &str).unwrap();
     delete_user_content(user);
+    if users.items.is_empty() {
+        LocalStorage::delete("content");
+    }
 }
 
 fn get_content_local_storage(user: &Option<String>) -> String {
@@ -235,9 +246,29 @@ fn home() -> Html {
         }
     };
 
+    let clear_all_content = || {
+        get_content(&MusicaList {
+            version: CURRENT_VERSION,
+            author: "".to_string(),
+            items: vec![],
+        })
+    };
+
+    let clear_all_url = || format!("?edit=true&content={}", clear_all_content());
+
     let delete_user = |user| {
+        let navigator = navigator.clone();
         move |_| {
             delete_user(&user);
+            // reload page:
+            let _ = navigator.push_with_query(
+                &Route::Home,
+                &Query {
+                    content: Some(clear_all_content()),
+                    edit: None,
+                    user: Some("".to_string()),
+                },
+            );
         }
     };
 
@@ -373,7 +404,7 @@ fn home() -> Html {
         let url = bookmark_url.clone();
         let navigator = navigator.clone();
         let list = list.clone();
-        Callback::from(move |e: InputEvent| {
+        Callback::from(move |e: FocusEvent| {
             let list_out = MusicaList {
                 version: (*list).clone().version,
                 author: e
@@ -412,7 +443,7 @@ fn home() -> Html {
         <>
         if edit == Some(true) {
             { "Musicalist for " }
-            <input type="text" value={ (*list).clone().author } oninput={update_author}/>
+            <input type="text" value={ (*list).clone().author } onfocusout={update_author}/>
         } else {
             { (*list).clone().author }
             { "'s Musicalist" }
@@ -513,24 +544,25 @@ fn home() -> Html {
         } </button>
         </p>
         <p>
-        <a href={"/musicalist"}>{ "Clear all" }</a>
+        <a href={clear_all_url()}>{ "New" }</a>
         { " " }
         <a href={"https://github.com/yazgoo/musicalist"}>{ "about" }</a>
         { " " }
-        <a href={ location.href.clone().replace("edit=true", "edit=false") }
+        <a href={ get_url(&list).clone().0.replace("edit=true", "edit=false") }
         title={"Right click + copy link adress to get url"}>{ "sharing url" }</a>
         </p>
         { "Users:" }
         <br/>
+        <table class={"center"}>
         { for get_users().items.iter().map(|user| {
             html! {
-                <>
-                <a href={ format!("/musicalist?user={}", user) }>{ user }</a>
-                <button title="remove user list" onclick={delete_user(user.clone())}>{ "🗑 " } </button>
-                <br/>
-                </>
+                <tr>
+                <td><a href={ format!("/musicalist?user={}", user) }>{ user }</a></td>
+                <td><button title="remove user list" onclick={delete_user(user.clone())}>{ "🗑 " }</button></td>
+                </tr>
             }
         })}
+        </table>
         </>
     }
 }
